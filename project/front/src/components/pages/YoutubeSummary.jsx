@@ -34,7 +34,7 @@ function parseCard(card) {
     const lines = card.content
       .split('\n')
       .map(line => line.trim())
-      .filter(line => line.length > 0);
+      .filter((line, index, self) => line.length > 0 && self.indexOf(line) === index); // 중복 제거
     return {
       type: "TIMELINE",
       lines,
@@ -102,47 +102,71 @@ export default function YoutubeSummary() {
   const rawCards = splitStreamCards(fullText);
   const cards = rawCards.map(parseCard);
 
+  // TIMELINE 카드 중복 제거
+  const filteredCards = [];
+  const seenTimelineKeys = new Set();
+
+  for (const card of cards) {
+    if (card.type === "TIMELINE") {
+      // lines가 없는 경우도 대비
+      const key = (card.lines || []).join('|');
+      if (seenTimelineKeys.has(key)) continue;
+      seenTimelineKeys.add(key);
+      filteredCards.push(card);
+    } else {
+      filteredCards.push(card);
+    }
+  }
+
   return (
     <div className="youtube-summary-page custom-scrollbar">
       <div className="logo-section">
         <img src={logo} className="logo" alt="logo" style={{ width: '150px', height: '150px' }} />
       </div>
+
       <div className="result-section">
         {error && (
           <Card>
             <p style={{ color: 'red' }}>{error}</p>
           </Card>
         )}
-        {cards.length === 0 && !loading && !error && (
+
+        {filteredCards.length === 0 && !loading && !error && (
           <Card>
-            <p>아직 요약 결과가 없습니다.</p>
+            <p>궁금해.. 이 영상이 궁금해..</p>
           </Card>
         )}
-        {cards.map((card, i) => (
-          <Card key={i} className={`card-${card.type.toLowerCase()}`}>
+
+        {filteredCards.map((card, i) => {
+        const cardClass = `card-${card.type.toLowerCase()}`; // e.g., card-comment, card-summary, card-timeline
+
+        return (
+          <Card key={i} className={cardClass}>
             {card.type === "COMMENT" && <div>{card.value}</div>}
             {card.type === "SUMMARY" && <div>{card.value}</div>}
             {card.type === "TIMELINE" && (
               <div>
                 {card.lines.map((line, idx) => {
-                    const time = line.slice(0, 7);
-                    const text = line.slice(7).trim();
+                  const time = line.slice(0, 7);
+                  const text = line.slice(7).trim();
 
-                    return (
-                        <div key={idx} className="timeline-entry" style={{ marginBottom: '20px' }}>{line}
-                            <span className="timeline_time">{time}</span>
-                            <span className="timeline_text">{text}</span>
-                        </div>
-                        );
+                  return (
+                    <div key={idx} className="timeline-entry" style={{ marginBottom: '20px' }}>
+                      <span className="timeline_time">{time}</span>
+                      <span className="timeline_text">{text}</span>
+                    </div>
+                  );
                 })}
               </div>
             )}
           </Card>
-        ))}
-        <Button onClick={handleSummarize} className="summarize-button-left" disabled={loading}>
-          {loading ? '요약 중...' : '요약 시작'}
-        </Button>
-      </div>
+        );
+      })}
+
+      <Button onClick={handleSummarize} className="summarize-button-left" disabled={loading}>
+        {loading ? '요약 중...' : '요약 시작'}
+      </Button>
     </div>
-  );
+  </div>
+);
 }
